@@ -6,17 +6,26 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
-# Ensure we load the model once
-model = SentenceTransformer('all-MiniLM-L6-v2')
-logger.info("Model loaded successfully.")
+logger.info("NLP Service initialized. Model will be loaded lazily on first request.")
+
+# Lazy initialization to prevent Uvicorn port binding timeout
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2' (this may take a minute)...")
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        logger.info("Model loaded successfully.")
+    return model
 
 def get_embedding(text: str) -> list[float]:
     """
     Generates an embedding for the given text.
     Returns a list of floats.
     """
-    embedding = model.encode(text)
+    m = get_model()
+    embedding = m.encode(text)
     return embedding.tolist()
 
 def serialize_embedding(embedding: list[float]) -> str:
