@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Duplicates - Registry</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>ProjectRegistry</h1>
+        </div>
+        <nav class="center-nav">
+            <a href="index.html">Home</a>
+            <a href="upload.html">Upload</a>
+            <a href="view.html">Projects</a>
+            <a href="duplicate.html" class="active">Duplicates</a>
+        </nav>
+        <div class="header-right">
+            <a href="admin.html">Admin</a>
+            <a href="#"><i class="fa-solid fa-magnifying-glass"></i></a>
+        </div>
+    </header>
+
+    <main>
+        <div class="card" style="max-width: 800px; margin: 0 auto;">
+            <h2 class="mb-3">NLP Duplicate Analyzer</h2>
+            <p class="text-muted mb-3">Check a project's originality against our database using SentenceTransformers.</p>
+            
+            <form id="checkForm">
+                <div class="form-group">
+                    <label>Draft Project Title *</label>
+                    <input type="text" id="title" required placeholder="Enter proposed title...">
+                </div>
+                
+                <div class="form-group">
+                    <label>Draft Project Description *</label>
+                    <textarea id="description" required placeholder="Enter proposed description..."></textarea>
+                </div>
+
+                <div class="d-flex justify-between align-center mt-3">
+                    <button type="submit" class="btn btn-primary" id="checkBtn">
+                        <i class="fa-solid fa-magnifying-glass"></i> Analyze Similarity
+                    </button>
+                    <div id="loading" class="hidden">
+                        <span class="spinner"></span> Comparing database entries...
+                    </div>
+                </div>
+            </form>
+
+            <div id="resultsArea" class="mt-4 hidden" style="border-top: 1px solid var(--border-color); padding-top: 2rem;">
+                <h3>Analysis Results</h3>
+                <div id="maxScore" class="mb-2" style="font-size: 1.2rem; margin-top: 1rem;"></div>
+                
+                <h4 class="mb-2 mt-3 text-muted">Top Matches:</h4>
+                <div id="matchesList"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script>
+        document.getElementById('checkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('checkBtn');
+            const loading = document.getElementById('loading');
+            const resultsArea = document.getElementById('resultsArea');
+            
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+            resultsArea.classList.add('hidden');
+
+            try {
+                const result = await api.checkDuplicate(title, description);
+                displayResults(result);
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
+
+        function displayResults(data) {
+            const resultsArea = document.getElementById('resultsArea');
+            const maxScoreEl = document.getElementById('maxScore');
+            const matchesList = document.getElementById('matchesList');
+            
+            resultsArea.classList.remove('hidden');
+            
+            const pct = (data.similarity_score * 100).toFixed(1);
+            
+            if (data.exact_match_found) {
+                maxScoreEl.innerHTML = `<span class="badge badge-warning" style="font-size: 1rem;"><i class="fa-solid fa-triangle-exclamation"></i> High Similarity (${pct}%)</span>`;
+            } else {
+                maxScoreEl.innerHTML = `<span class="badge badge-success" style="font-size: 1rem;"><i class="fa-solid fa-check"></i> Original Content (${pct}% max similarity)</span>`;
+            }
+
+            if (data.matching_projects.length === 0) {
+                matchesList.innerHTML = '<p class="text-muted">No similar projects found in the database.</p>';
+            } else {
+                matchesList.innerHTML = data.matching_projects.map((m, index) => `
+                    <div class="card mb-2 animated-result" style="padding: 1.5rem; animation-delay: ${index * 0.15}s;">
+                        <div class="d-flex justify-between align-center mb-1">
+                            <strong style="font-size: 1.1rem;">#${index+1} ${m.title}</strong>
+                        </div>
+                        <p class="text-muted text-sm mb-1">${m.description.substring(0, 150)}...</p>
+                        <div class="text-muted" style="font-size: 0.85rem;">
+                            Author: ${m.student_name} (${m.register_no})
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    </script>
+</body>
+</html>
