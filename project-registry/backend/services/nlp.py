@@ -1,4 +1,3 @@
-from sentence_transformers import SentenceTransformer, util
 import json
 import logging
 
@@ -6,25 +5,29 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("NLP Service initialized. Model will be loaded lazily on first request.")
+logger.info("NLP Service initialized. PyTorch & Model will be loaded lazily on first request.")
 
-# Lazy initialization to prevent Uvicorn port binding timeout
-model = None
+# Lazy initialization to prevent Uvicorn port binding timeout and swap-death on free tier.
+model_instance = None
+model_util = None
 
 def get_model():
-    global model
-    if model is None:
-        logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2' (this may take a minute)...")
-        model = SentenceTransformer('all-MiniLM-L6-v2')
+    global model_instance, model_util
+    if model_instance is None:
+        logger.info("Importing heavy PyTorch & SentenceTransformers libraries into memory...")
+        from sentence_transformers import SentenceTransformer, util
+        model_util = util
+        logger.info("Downloading/Loading the model weights 'all-MiniLM-L6-v2' (approx 80MB)...")
+        model_instance = SentenceTransformer('all-MiniLM-L6-v2')
         logger.info("Model loaded successfully.")
-    return model
+    return model_instance, model_util
 
 def get_embedding(text: str) -> list[float]:
     """
     Generates an embedding for the given text.
     Returns a list of floats.
     """
-    m = get_model()
+    m, _ = get_model()
     embedding = m.encode(text)
     return embedding.tolist()
 
@@ -45,5 +48,6 @@ def compute_similarity(emb1: list[float], emb2: list[float]) -> float:
     Computes cosine similarity between two embeddings.
     Returns a float between -1 and 1.
     """
-    similarity = util.cos_sim(emb1, emb2)
+    _, u = get_model()
+    similarity = u.cos_sim(emb1, emb2)
     return similarity.item() # Extract scalar from tensor
