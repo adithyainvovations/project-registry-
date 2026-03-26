@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Project - Registry</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <h1>ProjectRegistry</h1>
+        </div>
+        <nav class="center-nav">
+            <a href="index.html">Home</a>
+            <a href="upload.html" class="active">Upload</a>
+            <a href="view.html">Browse</a>
+            <a href="duplicate.html">Duplicates</a>
+        </nav>
+        <div class="header-right">
+            <a href="admin.html">Admin</a>
+            <a href="#"><i class="fa-solid fa-magnifying-glass"></i></a>
+        </div>
+    </header>
+
+    <main>
+        <div class="card" style="max-width: 800px; margin: 0 auto;">
+            <h2 class="mb-3">Submit New Project</h2>
+            <form id="uploadForm">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Register Number *</label>
+                        <input type="text" id="regNo" required minlength="7" placeholder="e.g. 95524455004">
+                    </div>
+                    <div class="form-group">
+                        <label>Student Name *</label>
+                        <input type="text" id="studentName" required placeholder="John Doe">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Submission Date *</label>
+                        <input type="date" id="subDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Submission Time *</label>
+                        <input type="time" id="subTime" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Project Title *</label>
+                    <input type="text" id="title" required placeholder="A Novel Approach to...">
+                </div>
+
+                <div class="form-group">
+                    <label>Project Description *</label>
+                    <textarea id="description" required placeholder="Detailed explanation..."></textarea>
+                </div>
+
+                <div class="d-flex justify-between align-center mt-3">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        Submit Project <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <div id="loading" class="hidden">
+                        <span class="spinner"></span> Processing NLP...
+                    </div>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <!-- Duplicate Warning Modal -->
+    <div class="modal-overlay" id="duplicateModal">
+        <div class="modal-content">
+            <h3 class="mb-2 text-warning"><i class="fa-solid fa-triangle-exclamation"></i> High Similarity Detected</h3>
+            <p class="mb-3 text-muted">This project is very similar to existing submissions. Review the matches below:
+            </p>
+
+            <div id="matchesContainer" class="mb-3"></div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary" onclick="closeModal()">Review & Edit</button>
+                <button class="btn btn-primary" onclick="forceSubmit()">Submit Anyway</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let currentFormData = null;
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+
+            currentFormData = {
+                register_no: document.getElementById('regNo').value,
+                student_name: document.getElementById('studentName').value,
+                submission_date: document.getElementById('subDate').value,
+                submission_time: document.getElementById('subTime').value,
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value
+            };
+
+            if (currentFormData.register_no.length < 7) {
+                showToast('Register Number must contain more than 6 characters.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            loading.classList.remove('hidden');
+
+            try {
+                // Check duplicates first
+                const dupCheck = await api.checkDuplicate(currentFormData.title, currentFormData.description);
+                if (dupCheck.exact_match_found) {
+                    showDuplicateWarning(dupCheck.matching_projects, dupCheck.similarity_score);
+                } else {
+                    await submitProject(currentFormData);
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                loading.classList.add('hidden');
+            }
+        });
+
+        function showDuplicateWarning(matches, score) {
+            const container = document.getElementById('matchesContainer');
+            container.innerHTML = matches.map((m, index) => `
+                <div class="card mb-2 animated-result" style="padding: 1rem; animation-delay: ${index * 0.15}s;">
+                    <strong>${m.title}</strong> (Score: ${(score * 100).toFixed(1)}%)<br>
+                    <span class="text-muted text-sm">By ${m.student_name} (${m.register_no})</span>
+                </div>
+            `).join('');
+
+            document.getElementById('duplicateModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('duplicateModal').classList.remove('active');
+        }
+
+        async function forceSubmit() {
+            closeModal();
+            try {
+                await submitProject(currentFormData);
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function submitProject(data) {
+            const res = await api.createProject(data);
+            showToast('Project submitted successfully!', 'success');
+            document.getElementById('uploadForm').reset();
+            currentFormData = null;
+        }
+    </script>
+</body>
+
+</html>
