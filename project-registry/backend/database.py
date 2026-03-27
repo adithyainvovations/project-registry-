@@ -1,10 +1,26 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+import os
+from dotenv import load_dotenv
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./projects_v2.db"
+load_dotenv()
+
+# Railway/Supabase sets DATABASE_URL automatically if provisioned, or user can set it manually.
+# Ensure it uses postgresql and not postgres (SQLAlchemy 1.4+ requirement)
+SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+if not SQLALCHEMY_DATABASE_URL:
+    # Local fallback
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./projects_v2.db"
+
+# SQLite requires specific connect_args, Postgres doesn't
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_DATABASE_URL, connect_args=connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

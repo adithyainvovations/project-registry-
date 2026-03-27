@@ -8,6 +8,8 @@ from ..models import (
     DuplicateCheckRequest, DuplicateCheckResponse
 )
 from ..services.nlp import get_embedding, serialize_embedding, deserialize_embedding, compute_similarity
+from ..cache import get_cache, set_cache, invalidate_cache
+import hashlib
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -17,7 +19,16 @@ SIMILARITY_THRESHOLD = 0.85
 @router.get("/", response_model=List[ProjectResponse])
 def get_projects(db: Session = Depends(get_db)):
     """Fetch all projects"""
-    return db.query(ProjectModel).all()
+    cached = get_cache("projects_list")
+    if cached:
+        return cached
+
+    projects = db.query(ProjectModel).all()
+    # Serialize to dicts for caching
+    projects_data = [ProjectResponse.model_validate(p).model_dump() for p in projects]
+    set_cache("projects_list", projects_data, expire_time=3600)
+    
+    return projects
 
 @router.post("/check-duplicate", response_model=DuplicateCheckResponse)
 def check_duplicate(request: DuplicateCheckRequest, db: Session = Depends(get_db)):
@@ -25,6 +36,11 @@ def check_duplicate(request: DuplicateCheckRequest, db: Session = Depends(get_db
     Checks if a given project title or description is a duplicate independently.
     Returns the maximum similarity score and any matching projects above the threshold.
     """
+    cache_key = f"dup_check_{hashlib.sha256(f'{request.title}|{request.description}'.encode()).hexdigest()}"
+    cached_result = get_cache(cache_key)
+    if cached_result:
+        return cached_result
+
     new_title_embedding = get_embedding(request.title)
     new_desc_embedding = get_embedding(request.description)
 
@@ -62,11 +78,15 @@ def check_duplicate(request: DuplicateCheckRequest, db: Session = Depends(get_db
     # Return top 3
     top_matches = [m[1] for m in matches[:3]]
     
-    return DuplicateCheckResponse(
+    result = DuplicateCheckResponse(
         similarity_score=max_score,
         matching_projects=top_matches,
         exact_match_found=(max_score > SIMILARITY_THRESHOLD)
     )
+    
+    # Store the result dict in cache
+    set_cache(cache_key, result.model_dump(), expire_time=86400) # cache for 24h
+    return result
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
@@ -95,5 +115,7 @@ def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
+    
+    invalidate_cache("projects_list")
     
     return db_project

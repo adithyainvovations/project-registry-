@@ -7,3 +7,5 @@ python-dotenv
 PyJWT
 pydantic
 python-multipart
+psycopg2-binary
+redis

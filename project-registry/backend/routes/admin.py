@@ -12,6 +12,7 @@ import io
 from ..database import get_db
 from ..models import ProjectModel, ProjectCreate, ProjectResponse
 from ..services.nlp import get_embedding, serialize_embedding
+from ..cache import invalidate_cache
 from pydantic import BaseModel
 
 load_dotenv()
@@ -55,6 +56,7 @@ def delete_project(project_id: int, db: Session = Depends(get_db), admin: str = 
         
     db.delete(project)
     db.commit()
+    invalidate_cache("projects_list")
     return None
 
 @router.put("/projects/{project_id}", response_model=ProjectResponse)
@@ -78,6 +80,7 @@ def update_project(project_id: int, updated_project: ProjectCreate, db: Session 
 
     db.commit()
     db.refresh(project)
+    invalidate_cache("projects_list")
     return project
 
 @router.get("/export")
