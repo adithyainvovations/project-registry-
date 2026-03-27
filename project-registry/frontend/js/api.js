@@ -1,5 +1,5 @@
 // TODO: Update this URL to your new Railway backend URL once deployed!
-const API_BASE_URL = 'https://project-registry-vbvh.onrender.com';
+const API_BASE_URL = 'https://project-registry-production.up.railway.app';
 
 const api = {
     async getProjects() {
@@ -35,7 +35,7 @@ const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            
+
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || 'Failed to create project');
             return result;
@@ -68,9 +68,9 @@ const api = {
             const token = sessionStorage.getItem('adminToken');
             const response = await fetch(`${API_BASE_URL}/admin/projects/${id}`, {
                 method: 'PUT',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(data)
             });
@@ -134,15 +134,15 @@ function showToast(message, type = 'success') {
     toast.style.opacity = '0';
     toast.style.transition = 'all 0.3s ease';
     toast.innerHTML = message;
-    
+
     document.body.appendChild(toast);
-    
+
     // Animate in
     requestAnimationFrame(() => {
         toast.style.opacity = '1';
         toast.style.transform = 'translate(-50%, 0)';
     });
-    
+
     setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translate(-50%, -20px)';
